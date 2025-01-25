@@ -21,7 +21,7 @@ def run_command(command, error_message):
 # Function to install required Python package
 def install_python_package(package):
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", package, "--break-system-packages"])
     except subprocess.CalledProcessError:
         print_message(f"Failed to install {package}. Please install it manually.", "red")
         sys.exit(1)
@@ -46,7 +46,7 @@ def install_tools():
 
     # Install LinkFinder dependencies
     print_message("Installing LinkFinder dependencies...")
-    run_command("pip install -r LinkFinder/requirements.txt", "Failed to install LinkFinder dependencies.")
+    run_command("pip install -r LinkFinder/requirements.txt --break-system-packages", "Failed to install LinkFinder dependencies.")
 
     # Clone SecretFinder
     print_message("Cloning SecretFinder repository...")
@@ -57,7 +57,7 @@ def install_tools():
 
     # Install SecretFinder dependencies
     print_message("Installing SecretFinder dependencies...")
-    run_command("pip install -r SecretFinder/requirements.txt", "Failed to install SecretFinder dependencies.")
+    run_command("pip install -r SecretFinder/requirements.txt --break-system-packages", "Failed to install SecretFinder dependencies.")
 
     # Finish message
     print_message("\nInstallation complete!")
