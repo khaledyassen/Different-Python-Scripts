@@ -4,12 +4,12 @@
 ## 💿️ Installation 💿️ 
 ```
 git clone https://github.com/khaledyassen/Different-Python-Scripts.git
-cd Auot_JS_Analysis
+cd Auto_JS_Analysis
 python3 install_tools.py
-python3 Auot_JS_Analysis.py -h
+python3 Auto_JS_Analysis.py -h
 ```
 
 ## Usage 🎯
 ```
-python3 Auot_JS_Analysis.py -i JavaScripts_URLs.txt -o Output_Directory
+python3 Auto_JS_Analysis.py -i JavaScripts_URLs.txt -o Output_Directory
 ```
