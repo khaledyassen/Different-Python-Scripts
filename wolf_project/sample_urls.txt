@@ -1,0 +1,12 @@
+# Wolf_Param_Injection input file
+#
+# One URL per line, each with its own query-string parameter(s).
+# Lines starting with # (and blank lines) are ignored.
+#
+# Every GET parameter on every URL below is tested individually; every
+# other parameter on that URL keeps its original value while one is
+# swapped out for a payload at a time.
+
+http://example.com/search?q=widgets&category=all
+http://example.com/profile?user_id=42&redirect=/dashboard
+http://example.com/download?file=report.pdf
