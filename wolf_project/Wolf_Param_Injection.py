@@ -16,6 +16,8 @@ IMPORTANT: only ever point this at systems you are authorized to test.
 
 import argparse
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from wolfscan import http_client, reporter, scanner
 from wolfscan.checks import CHECKS_BY_KEY, CHECKS
@@ -51,6 +53,8 @@ def parse_args(argv):
     p.add_argument("--no-color", action="store_true", help="disable ANSI colored output")
     p.add_argument("--no-banner", action="store_true", help="suppress the startup banner")
     p.add_argument("-q", "--quiet", action="store_true", help="only print the final summary, not per-URL detail")
+    p.add_argument("-w", "--threads", type=int, default=20,
+                    help="number of URLs to scan concurrently (default: 20; use 1 for old sequential behavior)")
     return p.parse_args(argv)
 
 
@@ -107,24 +111,65 @@ def main(argv=None):
     check_keys = resolve_checks(args.checks)
     proxies = {"http": args.proxy, "https": args.proxy} if args.proxy else None
     extra_headers = parse_headers(args.header)
-    session = http_client.build_session(user_agent=args.user_agent, extra_headers=extra_headers)
+
+    threads = max(1, args.threads)
+    # One session per worker thread avoids sharing a single connection pool's
+    # internal state across threads and lets each worker keep its own
+    # keep-alive connections to the targets it hits.
+    thread_local = threading.local()
+
+    def get_session():
+        sess = getattr(thread_local, "session", None)
+        if sess is None:
+            sess = http_client.build_session(user_agent=args.user_agent, extra_headers=extra_headers)
+            thread_local.session = sess
+        return sess
 
     print("Loaded %d URL(s) from %s" % (len(urls), args.file))
     print("Checks enabled: %s" % ", ".join(CHECKS_BY_KEY[k].LABEL for k in check_keys))
+    print("Concurrency: %d thread(s)" % threads)
     print()
 
-    all_results = []
-    for i, url in enumerate(urls, 1):
-        if not args.quiet:
-            print(color("[%d/%d] scanning %s" % (i, len(urls), url), reporter.BOLD))
+    print_lock = threading.Lock()
+    done_count = 0
+    total = len(urls)
+    # results[i] holds the result for urls[i] so the report preserves the
+    # original file order even though scans complete out of order.
+    results = [None] * total
+
+    def worker(index, url):
+        session = get_session()
         result = scanner.scan_url(
             url, session, check_keys, timeout=args.timeout,
             verify=not args.insecure, proxies=proxies, delay=args.delay,
         )
-        all_results.append(result)
-        if not args.quiet:
-            reporter.print_url_result(result, color)
+        return index, url, result
 
+    if threads == 1:
+        # Preserves the exact old sequential behavior/order if requested.
+        for i, url in enumerate(urls, 1):
+            if not args.quiet:
+                print(color("[%d/%d] scanning %s" % (i, total, url), reporter.BOLD))
+            result = scanner.scan_url(
+                url, get_session(), check_keys, timeout=args.timeout,
+                verify=not args.insecure, proxies=proxies, delay=args.delay,
+            )
+            results[i - 1] = result
+            if not args.quiet:
+                reporter.print_url_result(result, color)
+    else:
+        with ThreadPoolExecutor(max_workers=threads) as pool:
+            futures = {pool.submit(worker, i, url): url for i, url in enumerate(urls)}
+            for fut in as_completed(futures):
+                index, url, result = fut.result()
+                results[index] = result
+                done_count += 1
+                if not args.quiet:
+                    with print_lock:
+                        print(color("[%d/%d] scanned %s" % (done_count, total, url), reporter.BOLD))
+                        reporter.print_url_result(result, color)
+
+    all_results = results
     reporter.print_summary(all_results, color)
 
     if args.output:
