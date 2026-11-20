@@ -74,6 +74,11 @@ Run everything, print to the terminal, and also save a JSON report:
 python3 wolf.py -f urls.txt -o report.json
 ```
 
+Fast Scan
+```bash
+python3 Wolf_Param_Injection.py -f urls.txt -w 30 --retries 2 --connect-timeout 4 -t 8 --max-url-time 25 --checkpoint done.txt --autosave-every 50 -o report.json
+```
+
 Only test for XSS and Open Redirect, through a local proxy:
 
 ```bash
